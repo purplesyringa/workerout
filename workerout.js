@@ -5,7 +5,7 @@ let worker = () => {
 				postMessage({
 					id: e.data.id,
 					result: eval(e.data.func).apply(eval(e.data.root), e.data.args.map(arg => {
-						if(arg.indexOf("__self__") == 0) {
+						if(typeof arg == "string" && arg.indexOf("__self__") == 0) {
 							let __self__ = this;
 							return eval(arg);
 						} else {
