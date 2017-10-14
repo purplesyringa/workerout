@@ -82,7 +82,7 @@ class WorkerOutProxy {
 		this.additional = {};
 		this.root = root;
 
-		return new Proxy({}, {
+		return new Proxy(this._call, {
 			getOwnPropertyDescriptor: this._getOwnPropertyDescriptor.bind(this),
 			ownKeys: this._ownKeys.bind(this),
 			defineProperty: this._defineProperty.bind(this),
@@ -94,6 +94,8 @@ class WorkerOutProxy {
 		});
 	}
 
+	_call(...args) {
+	}
 	_getOwnPropertyDescriptor(target, name) {
 		return Object.getOwnPropertyDescriptor(this.additional, name) || Object.getOwnPropertyDescriptor(this.alternative, name);
 	}
