@@ -82,7 +82,7 @@ class WorkerOutProxy {
 		this.additional = {};
 		this.root = root;
 
-		return new Proxy(this.additional, {
+		return new Proxy({}, {
 			getOwnPropertyDescriptor: this._getOwnPropertyDescriptor.bind(this),
 			ownKeys: this._ownKeys.bind(this),
 			defineProperty: this._defineProperty.bind(this),
@@ -95,41 +95,41 @@ class WorkerOutProxy {
 	}
 
 	_getOwnPropertyDescriptor(target, name) {
-		return Object.getOwnPropertyDescriptor(target, name) || Object.getOwnPropertyDescriptor(this.alternative, name);
+		return Object.getOwnPropertyDescriptor(this.additional, name) || Object.getOwnPropertyDescriptor(this.alternative, name);
 	}
 	_ownKeys(target) {
-		return Object.keys(this.alternative).concat(Object.keys(target)).filter((obj, i, arr) => arr.indexOf(obj) == i);
+		return Object.keys(this.alternative).concat(Object.keys(this.additional)).filter((obj, i, arr) => arr.indexOf(obj) == i);
 	}
 	_defineProperty(target, name, propertyDescriptor) {
 		this.callFunction("Object.defineProperty", "Object", "__self__", name, propertyDescriptor);
-		Object.defineProperty(target, name, propertyDescriptor);
+		Object.defineProperty(this.additional, name, propertyDescriptor);
 	}
 	_deleteProperty(target, name) {
 		this.exec("delete __self__[" + JSON.stringify(name) + "];");
-		delete target[name];
+		delete this.additional[name];
 	}
 	_preventExtensions(target) {
 	}
 	_has(target, name) {
-		return name in target || name in this.alternative;
+		return name in this.additional || name in this.alternative;
 	}
 	_get(target, name, reciever) {
-		if(typeof target[name] == "function" || typeof this.alternative[name] == "function") {
+		if(typeof this.additional[name] == "function" || typeof this.alternative[name] == "function") {
 			return (...args) => {
 				return this.callFunction(this.root + "[" + JSON.stringify(name) + "]", this.root, ...args);
 			};
 		} else if(
-			(typeof target[name] != "object" && target[name] !== null) &&
+			(typeof this.additional[name] != "object" && this.additional[name] !== null) &&
 			(typeof this.alternative[name] != "object" && this.alternative[name] !== null)
 		) {
-			return target[name] === undefined ? this.alternative[name] : target[name];
+			return this.additional[name] === undefined ? this.alternative[name] : this.additional[name];
 		} else {
-			return new WorkerOutProxy(this.worker, target[name] || this.alternative[name], this.root + "[" + JSON.stringify(name) + "]");
+			return new WorkerOutProxy(this.worker, this.additional[name] || this.alternative[name], this.root + "[" + JSON.stringify(name) + "]");
 		}
 	}
 	_set(target, name, value, reciever) {
 		this.exec("__self__[" + JSON.stringify(name) + "] = " + JSON.stringify(value) + ";");
-		target[name] = value;
+		this.additional[name] = value;
 	}
 
 	callFunction(func, root, ...args) {
