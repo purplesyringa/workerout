@@ -1,5 +1,38 @@
 (() => {
-	let cloneRules = {};
+	let cloneRules = {
+		Response: {
+			from: response => {
+				return response.blob()
+					.then(blob => {
+						return {
+							headers: cloneRules.Headers.from(response.headers),
+							status: response.status,
+							statusText: response.statusText,
+							blob: blob
+						};
+					});
+			},
+			to: json => {
+				return new Response(json.blob, {
+					status: json.status,
+					statusText: json.statusText,
+					headers: cloneRules.Headers.to(json.headers)
+				});
+			}
+		},
+		Headers: {
+			from: headers => {
+				return Array.from(headers.entries());
+			},
+			to: entries => {
+				let headers = new Headers();
+				entries.forEach(entry => {
+					headers.append(entry[0], entry[1]);
+				});
+				return headers;
+			}
+		}
+	};
 
 	let worker = () => {
 		CLONE_RULES;
