@@ -213,6 +213,10 @@
 		}
 
 		_call(func, ...args) {
+			if(typeof func != "function") {
+				throw new TypeError(func + " is not a function");
+			}
+
 			return this.callFunction("(" + func.toString() + ")", "", ...args);
 		}
 		_getOwnPropertyDescriptor(target, name) {
@@ -279,14 +283,25 @@
 							return this.pass(root, name, converted, type);
 						});
 				} else {
-					return this.set(root, name, {})
-						.then(() => {
-							return Promise.all(
-								Object.keys(value).map(childName => {
-									return this.recursiveSet(root + "[" + JSON.stringify(name) + "]", childName, value[childName]);
-								})
-							);
-						});
+					if(value instanceof Array) {
+						return this.set(root, name, [])
+							.then(() => {
+								return Promise.all(
+									value.map((item, i) => {
+										return this.recursiveSet(root + "[" + JSON.stringify(name) + "]", i, item);
+									})
+								);
+							});
+					} else {
+						return this.set(root, name, {})
+							.then(() => {
+								return Promise.all(
+									Object.keys(value).map(childName => {
+										return this.recursiveSet(root + "[" + JSON.stringify(name) + "]", childName, value[childName]);
+									})
+								);
+							});
+					}
 				}
 			} else {
 				return this.set(root, name, value);
