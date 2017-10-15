@@ -1,5 +1,13 @@
 (() => {
 	let cloneRules = {
+		Function: {
+			from: func => {
+				return func.toString();
+			},
+			to: code => {
+				return eval("(" + code + ")");
+			}
+		},
 		Response: {
 			from: response => {
 				return response.blob()
@@ -261,9 +269,7 @@
 		}
 
 		recursiveSet(root, name, value) {
-			if(typeof value == "function") {
-				return this.exec("__self__" + root + "[" + JSON.stringify(name) + "] = " + value.toString() + "; null");
-			} else if(typeof value == "object" && value !== null) {
+			if((typeof value == "object" && value !== null) || typeof value == "function") {
 				let type = toString.call(value).match(/^\[object (.*)\]$/)[1];
 
 				if(cloneRules[type]) {
