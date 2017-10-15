@@ -1,4 +1,6 @@
 let worker = () => {
+	let __self__ = this;
+
 	onmessage = e => {
 		if(e.data.action == "call") {
 			try {
@@ -6,7 +8,6 @@ let worker = () => {
 					id: e.data.id,
 					result: eval(e.data.func).apply(eval(e.data.root), e.data.args.map(arg => {
 						if(typeof arg == "string" && arg.indexOf("__self__") == 0) {
-							let __self__ = this;
 							return eval(arg);
 						} else {
 							return arg;
@@ -31,6 +32,20 @@ let worker = () => {
 					error: err.toString()
 				});
 			}
+		} else if(e.data.action == "set") {
+			try {
+				eval(e.data.root)[e.data.name] = e.data.value;
+
+				postMessage({
+					id: e.data.id,
+					result: true
+				});
+			} catch(err) {
+				postMessage({
+					id: e.data.id,
+					error: err.toString()
+				});
+			}
 		} else {
 			postMessage({
 				id: e.data.id,
@@ -48,7 +63,7 @@ class WorkerOut {
 		this.url = URL.createObjectURL(new Blob(["(" + worker.toString() + ")();"], {type: "text/javascript"}));
 		this.worker = new Worker(this.url);
 		this.worker.onmessage = this.onmessage.bind(this);
-		return new WorkerOutProxy(this, window, "this");
+		return new WorkerOutProxy(this, window, "");
 	}
 
 	onmessage(e) {
@@ -119,7 +134,7 @@ class WorkerOutProxy {
 	_get(target, name, reciever) {
 		if(typeof this.additional[name] == "function" || typeof this.alternative[name] == "function") {
 			return (...args) => {
-				return this.callFunction(this.root + "[" + JSON.stringify(name) + "]", this.root, ...args);
+				return this.callFunction("__self__[" + JSON.stringify(name) + "]", "__self__", ...args);
 			};
 		} else if(
 			(typeof this.additional[name] != "object" && this.additional[name] !== null) &&
@@ -131,7 +146,7 @@ class WorkerOutProxy {
 		}
 	}
 	_set(target, name, value, reciever) {
-		this.exec("__self__[" + JSON.stringify(name) + "] = " + JSON.stringify(value) + ";");
+		this.set(name, value);
 		this.additional[name] = value;
 	}
 
@@ -147,6 +162,14 @@ class WorkerOutProxy {
 		return this.worker.postMessage({
 			action: "exec",
 			code: code.replace(/__self__/g, "__self__" + this.root)
+		});
+	}
+	set(name, value) {
+		return this.worker.postMessage({
+			action: "set",
+			root: "__self__" + this.root,
+			name: name,
+			value: value
 		});
 	}
 };
