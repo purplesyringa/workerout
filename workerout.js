@@ -82,7 +82,7 @@ class WorkerOutProxy {
 		this.additional = {};
 		this.root = root;
 
-		return new Proxy(this._call, {
+		return new Proxy(this._call.bind(this), {
 			getOwnPropertyDescriptor: this._getOwnPropertyDescriptor.bind(this),
 			ownKeys: this._ownKeys.bind(this),
 			defineProperty: this._defineProperty.bind(this),
@@ -94,7 +94,8 @@ class WorkerOutProxy {
 		});
 	}
 
-	_call(...args) {
+	_call(func, ...args) {
+		return this.callFunction("(" + func.toString() + ")", "", ...args);
 	}
 	_getOwnPropertyDescriptor(target, name) {
 		return Object.getOwnPropertyDescriptor(this.additional, name) || Object.getOwnPropertyDescriptor(this.alternative, name);
