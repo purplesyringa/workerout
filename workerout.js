@@ -146,15 +146,15 @@ class WorkerOutProxy {
 		}
 	}
 	_set(target, name, value, reciever) {
-		this.set(name, value);
+		this.recursiveSet("", name, value);
 		this.additional[name] = value;
 	}
 
 	callFunction(func, root, ...args) {
 		return this.worker.postMessage({
 			action: "call",
-			func: func,
-			root: root,
+			func: func.replace(/__self__/g, "__self__" + this.root),
+			root: root.replace(/__self__/g, "__self__" + this.root),
 			args: args.map(arg => arg == "__self__" ? "__self__" + this.root : arg)
 		});
 	}
@@ -164,10 +164,27 @@ class WorkerOutProxy {
 			code: code.replace(/__self__/g, "__self__" + this.root)
 		});
 	}
-	set(name, value) {
+
+	recursiveSet(root, name, value) {
+		if(typeof value == "function") {
+			return this.exec("__self__" + root + "[" + JSON.stringify(name) + "] = " + value.toString() + "; null");
+		} else if(typeof value == "object" && value !== null) {
+			return this.set(root, name, {})
+				.then(() => {
+					return Promise.all(
+						Object.keys(value).map(childName => {
+							return this.recursiveSet(root + "[" + JSON.stringify(name) + "]", childName, value[childName]);
+						})
+					);
+				});
+		} else {
+			return this.set(root, name, value);
+		}
+	}
+	set(root, name, value) {
 		return this.worker.postMessage({
 			action: "set",
-			root: "__self__" + this.root,
+			root: "__self__" + this.root + root,
 			name: name,
 			value: value
 		});
