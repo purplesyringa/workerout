@@ -258,11 +258,22 @@
 		}
 
 		callFunction(func, root, ...args) {
-			return this.worker.postMessage({
-				action: "call",
-				func: func.replace(/__self__/g, "__self__" + this.root),
-				root: root.replace(/__self__/g, "__self__" + this.root),
-				args: args.map(arg => arg == "__self__" ? "__self__" + this.root : arg)
+			return Promise.all(
+				args.map((arg, i) => {
+					if(arg == "__self__") {
+						return "__self__" + this.root;
+					} else {
+						return this.recursiveSet("", "__arg_" + i + "__", arg)
+							.then(() => "__self__" + this.root + ".__arg_" + i + "__");
+					}
+				})
+			).then(args => {
+				return this.worker.postMessage({
+					action: "call",
+					func: func.replace(/__self__/g, "__self__" + this.root),
+					root: root.replace(/__self__/g, "__self__" + this.root),
+					args: args
+				});
 			});
 		}
 		exec(code) {
