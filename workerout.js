@@ -1,20 +1,60 @@
 (() => {
+	let cloneRules = {};
+
 	let worker = () => {
+		CLONE_RULES;
+
 		let __self__ = this;
 
 		onmessage = e => {
 			if(e.data.action == "call") {
 				try {
-					postMessage({
-						id: e.data.id,
-						result: eval(e.data.func).apply(eval(e.data.root), e.data.args.map(arg => {
-							if(typeof arg == "string" && arg.indexOf("__self__") == 0) {
-								return eval(arg);
+					let result = eval(e.data.func).apply(eval(e.data.root), e.data.args.map(arg => {
+						if(typeof arg == "string" && arg.indexOf("__self__") == 0) {
+							return eval(arg);
+						} else {
+							return arg;
+						}
+					}));
+
+					if(!(result instanceof Promise)) {
+						result = Promise.resolve(result);
+					}
+
+					result
+						.then(result => {
+							let type = toString.call(result).match(/^\[object (.*)\]$/)[1];
+
+							let promise;
+
+							if(cloneRules[type]) {
+								promise = Promise.resolve()
+									.then(() => cloneRules[type].from(result))
+									.then(converted => {
+										postMessage({
+											id: e.data.id,
+											result: converted,
+											type: type
+										});
+									});
 							} else {
-								return arg;
+								promise = Promise.resolve()
+									.then(() => {
+										postMessage({
+											id: e.data.id,
+											result: result
+										});
+									});
 							}
-						}))
-					});
+
+							return promise;
+						})
+						.catch(err => {
+							postMessage({
+								id: e.data.id,
+								error: err.toString()
+							});
+						});
 				} catch(err) {
 					postMessage({
 						id: e.data.id,
@@ -47,6 +87,20 @@
 						error: err.toString()
 					});
 				}
+			} else if(e.data.action == "pass") {
+				try {
+					eval(e.data.root)[e.data.name] = cloneRules[e.data.type].to(e.data.value);
+
+					postMessage({
+						id: e.data.id,
+						result: true
+					});
+				} catch(err) {
+					postMessage({
+						id: e.data.id,
+						error: err.toString()
+					});
+				}
 			} else {
 				postMessage({
 					id: e.data.id,
@@ -61,7 +115,12 @@
 			this.id = 0;
 			this.waiting = {};
 
-			this.url = URL.createObjectURL(new Blob(["(" + worker.toString() + ")();"], {type: "text/javascript"}));
+			let cloneRulesParsed = "let cloneRules = {};\n";
+			Object.keys(cloneRules).forEach(name => {
+				cloneRulesParsed += "cloneRules." + name + " = {from: " + cloneRules[name].from.toString() + ", to: " + cloneRules[name].to.toString() + "};\n";
+			});
+
+			this.url = URL.createObjectURL(new Blob(["(" + worker.toString().replace("CLONE_RULES;", cloneRulesParsed) + ")();"], {type: "text/javascript"}));
 			this.worker = new Worker(this.url);
 			this.worker.onmessage = this.onmessage.bind(this);
 			return new WorkerOutProxy(this, window, "");
@@ -74,6 +133,8 @@
 
 			if(e.data.error) {
 				this.waiting[e.data.id].reject(e.data.error);
+			} else if(e.data.type) {
+				this.waiting[e.data.id].resolve(cloneRules[e.data.type].to(e.data.result));
 			} else {
 				this.waiting[e.data.id].resolve(e.data.result);
 			}
@@ -170,14 +231,24 @@
 			if(typeof value == "function") {
 				return this.exec("__self__" + root + "[" + JSON.stringify(name) + "] = " + value.toString() + "; null");
 			} else if(typeof value == "object" && value !== null) {
-				return this.set(root, name, {})
-					.then(() => {
-						return Promise.all(
-							Object.keys(value).map(childName => {
-								return this.recursiveSet(root + "[" + JSON.stringify(name) + "]", childName, value[childName]);
-							})
-						);
-					});
+				let type = toString.call(value).match(/^\[object (.*)\]$/)[1];
+
+				if(cloneRules[type]) {
+					return Promise.resolve()
+						.then(() => cloneRules[type].from(value))
+						.then(converted => {
+							return this.pass(root, name, converted, type);
+						});
+				} else {
+					return this.set(root, name, {})
+						.then(() => {
+							return Promise.all(
+								Object.keys(value).map(childName => {
+									return this.recursiveSet(root + "[" + JSON.stringify(name) + "]", childName, value[childName]);
+								})
+							);
+						});
+				}
 			} else {
 				return this.set(root, name, value);
 			}
@@ -188,6 +259,15 @@
 				root: "__self__" + this.root + root,
 				name: name,
 				value: value
+			});
+		}
+		pass(root, name, value, type) {
+			return this.worker.postMessage({
+				action: "pass",
+				root: "__self__" + this.root + root,
+				name: name,
+				value: value,
+				type: type
 			});
 		}
 	};
