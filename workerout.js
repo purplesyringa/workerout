@@ -284,21 +284,40 @@
 						});
 				} else {
 					if(value instanceof Array) {
-						return this.set(root, name, [])
+						let newArr = [];
+						value.forEach((item, i) => {
+							if((typeof item != "object" || item === null) && typeof item != "function") {
+								newArr[i] = item;
+							}
+						});
+
+						return this.set(root, name, newArr)
 							.then(() => {
 								return Promise.all(
-									value.map((item, i) => {
-										return this.recursiveSet(root + "[" + JSON.stringify(name) + "]", i, item);
-									})
+									value
+										.map((item, i) => {
+											if((typeof item == "object" && item !== null) || typeof item == "function") {
+												return this.recursiveSet(root + "[" + JSON.stringify(name) + "]", i, item);
+											}
+										})
 								);
 							});
 					} else {
-						return this.set(root, name, {})
+						let newObject = {};
+						Object.keys(value).forEach(key => {
+							if((typeof value[key] != "object" || value[key] === null) && typeof value[key] != "function") {
+								newObject[key] = value[key];
+							}
+						});
+
+						return this.set(root, name, newObject)
 							.then(() => {
 								return Promise.all(
-									Object.keys(value).map(childName => {
-										return this.recursiveSet(root + "[" + JSON.stringify(name) + "]", childName, value[childName]);
-									})
+									Object.keys(value)
+										.filter(childName => (typeof value[childName] == "object" && value[childName] !== null) || typeof value[childName] == "function")
+										.map(childName => {
+											return this.recursiveSet(root + "[" + JSON.stringify(name) + "]", childName, value[childName]);
+										})
 								);
 							});
 					}
