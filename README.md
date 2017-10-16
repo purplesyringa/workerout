@@ -82,3 +82,21 @@ let worker = new WorkerOut();
 worker.CoolClass = CoolClass;
 worker.CoolClass.getAnswer(json).then(alert);
 ```
+
+## Methods
+
+1. Save and load data:
+    ```javascript
+    worker.answer = 42;
+    console.log(worker.answer); // 42
+    ```
+
+2. Call WorkerOut as a function to make it async:
+    ```javascript
+    worker(() => answer); // Promise <42>
+    ```
+
+3. Call default functions:
+    ```javascript
+    worker.JSON.parse("{}"); // Promise <Object {}>
+    ```
