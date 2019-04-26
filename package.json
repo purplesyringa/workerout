@@ -1,0 +1,8 @@
+{
+  "name": "workerout",
+  "version": "1.0.1",
+  "main": "index.js",
+  "repository": "https://github.com/imachug/WorkerOut",
+  "author": "Ivanq",
+  "license": "MIT"
+}
